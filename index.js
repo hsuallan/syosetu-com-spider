@@ -49,12 +49,28 @@ function line(str){
 	return str + '\n'
 }
 
-function write_to(novel, index = ""){
-	const stream = fs.createWriteStream("novels/" + index +"_" + novel.title+".kobako.txt", {encoding: 'utf8'});
+function write_to(novel_id,novel, index = ""){
+	const dir = 'novels/'+novel_id+'/'
+	if (!fs.existsSync(dir)){
+		fs.mkdirSync(dir);
+	}
+	// padding left
+	while(index.toString().length < max.length){
+		index = '0'+index
+	}
+	const stream = fs.createWriteStream(dir + index +"_" + novel.title+".kobako.txt", {encoding: 'utf8'});
 	stream.once('open', function(fd) {
 		stream.write(line(novel.title))
 		novel.rows.forEach(r => {
-			stream.write(line(r))
+			if(r.length<80){
+				stream.write(line(r))
+			}else{
+				r.split('。').forEach(x=>{
+					// not empty
+					if(!!x) stream.write(line('　'+x.trim()+'。'))
+				})
+			}
+			
 		})
 		stream.end()
 	})
@@ -71,17 +87,21 @@ fs.readFile('393.txt', 'utf8', function(err, contents) {
 // 0 == node.exe 1 == thisfile's path
 const novel_id = process.argv[2]
 const min = process.argv[3]
-const max = process.argv[4]
-
-
-console.log(novel_id, min, max)
-
-for(let i=min;i <= max;i++){
-	console.log(i)
-	from_net_work(novel_id, i).then(data => {
-		write_to(novel(data), i)
-	}).catch(err => {
-		console.log(err)
-	})
+// only one page
+const max = process.argv[4]||min
+const pages = []
+// push [min,max]
+for (let index = parseInt(min); index <= max; index++) {
+	pages.push(index)
 }
-
+// async for loop
+;(async ()=>{
+	for await(const page of pages) {
+		console.log(novel_id,page)
+		from_net_work(novel_id, page).then(data => {
+			write_to(novel_id,novel(data), page)
+		}).catch(err => {
+			console.log(err)
+		})
+	}
+})()
